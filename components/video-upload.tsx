@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { Video } from "lucide-react"
 
 type VideoResult = {
+  video_url: string
   video_results: Array<{
     frame_index: number
     object_count: Record<string, number>
@@ -27,7 +26,8 @@ export function VideoUpload() {
   const [result, setResult] = useState<VideoResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [maxCounts, setMaxCounts] = useState<Record<string, number>>({})
-  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
+  const [processedVideoUrl, setProcessedVideoUrl] = useState<string | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -36,10 +36,11 @@ export function VideoUpload() {
       setResult(null)
       setError(null)
       setMaxCounts({})
+      setProcessedVideoUrl(null)
 
       // Create URL for video preview
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
-      setVideoUrl(URL.createObjectURL(selectedFile))
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
+      setVideoPreviewUrl(URL.createObjectURL(selectedFile))
     }
   }
 
@@ -58,13 +59,10 @@ export function VideoUpload() {
       const formData = new FormData()
       formData.append("file", file)
 
-      // Simulate progress since the API doesn't provide progress updates
+      // Simulate progress
       const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          const newProgress = prev + 5
-          return newProgress > 90 ? 90 : newProgress
-        })
-      }, 500)
+        setProgress((prev) => (prev >= 95 ? 95 : prev + 5))
+      }, 400)
 
       const response = await fetch("https://krish09bha-object-detection-kodrish.hf.space/upload-video/", {
         method: "POST",
@@ -80,6 +78,7 @@ export function VideoUpload() {
 
       const data = await response.json()
       setResult(data)
+      setProcessedVideoUrl(data.video_url) // Get the processed video URL from API
 
       // Calculate max counts across all frames
       if (data.video_results && data.video_results.length > 0) {
@@ -87,9 +86,7 @@ export function VideoUpload() {
 
         data.video_results.forEach((frame) => {
           Object.entries(frame.object_count).forEach(([object, count]) => {
-            if (!counts[object] || counts[object] < (count as number)) {
-              counts[object] = count as number
-            }
+            counts[object] = Math.max(counts[object] || 0, count as number)
           })
         })
 
@@ -105,9 +102,9 @@ export function VideoUpload() {
   // Clean up video URL when component unmounts
   useEffect(() => {
     return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
     }
-  }, [videoUrl])
+  }, [videoPreviewUrl])
 
   return (
     <div className="space-y-6">
@@ -126,9 +123,10 @@ export function VideoUpload() {
               </label>
             </div>
 
-            {videoUrl && (
+            {videoPreviewUrl && (
               <div className="mt-4">
-                <video src={videoUrl} controls className="w-full h-auto rounded-lg" style={{ maxHeight: "300px" }}>
+                <h3 className="text-sm font-semibold mb-1">Preview</h3>
+                <video src={videoPreviewUrl} controls className="w-full h-auto rounded-lg" style={{ maxHeight: "300px" }}>
                   Your browser does not support the video tag.
                 </video>
               </div>
@@ -149,6 +147,19 @@ export function VideoUpload() {
           </form>
         </CardContent>
       </Card>
+
+      {processedVideoUrl && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Processed Video</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <video src={processedVideoUrl} controls className="w-full h-auto rounded-lg">
+              Your browser does not support the video tag.
+            </video>
+          </CardContent>
+        </Card>
+      )}
 
       {result && (
         <Card>
@@ -191,10 +202,7 @@ export function VideoUpload() {
                           <td className="px-4 py-2 whitespace-nowrap text-sm">{frame.frame_index}</td>
                           <td className="px-4 py-2 text-sm">
                             {Object.entries(frame.object_count).map(([object, count]) => (
-                              <span
-                                key={object}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-1"
-                              >
+                              <span key={object} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-1">
                                 {object}: {count}
                               </span>
                             ))}
@@ -212,4 +220,3 @@ export function VideoUpload() {
     </div>
   )
 }
-
