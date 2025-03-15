@@ -15,7 +15,7 @@ type ImageResult = {
   }>;
 };
 
-export function CameraCapture() {
+export function VideoUpload() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
